@@ -1,0 +1,1365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>The Inner Circle • Private Group Chat</title>
+  <meta name="theme-color" content="#008069" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link id="pwa-manifest" rel="manifest" />
+
+  <!-- Tailwind CSS & Google Fonts -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    * {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: #dadbd3;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100dvh;
+    }
+
+    /* WhatsApp subtle doodle background pattern */
+    .wa-wallpaper {
+      background-color: #efeae2;
+      background-image: url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23d6cfc2' stroke-width='1.2' stroke-opacity='0.55'%3E%3Cpath d='M14 16c3-3 8-3 11 0s3 8 0 11l-5.5 5.5L14 27c-3-3-3-8 0-11z'/%3E%3Ccircle cx='60' cy='20' r='6'/%3E%3Cpath d='M56 20h8M60 16v8'/%3E%3Crect x='14' y='54' width='12' height='9' rx='2'/%3E%3Cpath d='M16 54v-2a4 4 0 0 1 8 0v2'/%3E%3Cpath d='M55 58l5-5 7 7-5 5z'/%3E%3Ccircle cx='40' cy='40' r='2' fill='%23d6cfc2'/%3E%3C/g%3E%3C/svg%3E");
+    }
+
+    /* Custom thin scrollbar */
+    .chat-scroll::-webkit-scrollbar {
+      width: 6px;
+    }
+    .chat-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .chat-scroll::-webkit-scrollbar-thumb {
+      background: rgba(11, 20, 26, 0.2);
+      border-radius: 9999px;
+    }
+
+    /* Bubble tail notches */
+    .bubble-out {
+      background-color: #d9fdd3;
+      border-radius: 12px 0px 12px 12px;
+      box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
+    }
+    .bubble-out-cont {
+      background-color: #d9fdd3;
+      border-radius: 12px;
+      box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
+    }
+    .bubble-in {
+      background-color: #ffffff;
+      border-radius: 0px 12px 12px 12px;
+      box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
+    }
+    .bubble-in-cont {
+      background-color: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
+    }
+
+    /* Highlight animation when jumping to a replied message */
+    @keyframes flashHighlight {
+      0%, 100% { filter: brightness(1); }
+      35% { filter: brightness(0.86); transform: scale(1.01); }
+    }
+    .highlight-msg {
+      animation: flashHighlight 1.2s ease-in-out;
+    }
+
+    /* Smooth drawer transition */
+    .drawer-enter {
+      transform: translateX(0%);
+    }
+    .drawer-exit {
+      transform: translateX(100%);
+    }
+  </style>
+</head>
+<body class="flex items-center justify-center sm:p-3 md:p-5">
+
+  <!-- Top desktop green accent strip -->
+  <div class="hidden sm:block fixed top-0 left-0 right-0 h-32 bg-[#00a884] -z-10"></div>
+
+  <!-- Main Centered App Container -->
+  <div id="app-shell" class="relative w-full max-w-4xl h-full sm:h-[94dvh] bg-white sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-black/10">
+
+    <!-- ==================== 1. LOADING OVERLAY ==================== -->
+    <div id="loading-screen" class="absolute inset-0 z-50 bg-[#f0f2f5] flex flex-col items-center justify-center p-6 text-center">
+      <div class="w-16 h-16 rounded-2xl bg-[#00a884] flex items-center justify-center shadow-lg mb-4 animate-pulse">
+        <svg class="w-9 h-9 text-white" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 2C6.48 2 2 6.03 2 11c0 2.39 1.05 4.56 2.76 6.16L3.5 21.5l4.66-1.39C9.37 20.68 10.66 21 12 21c5.52 0 10-4.03 10-9s-4.48-10-10-10zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/>
+        </svg>
+      </div>
+      <h2 class="text-lg font-semibold text-slate-800">Connecting to The Inner Circle</h2>
+      <p class="text-xs text-slate-500 mt-1">End-to-end synced group room...</p>
+    </div>
+
+    <!-- ==================== 2. PROFILE SETUP / ONBOARDING MODAL ==================== -->
+    <div id="onboarding-screen" class="hidden absolute inset-0 z-40 bg-[#f0f2f5] flex flex-col items-center justify-center p-4 overflow-y-auto">
+      <div class="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-200/80 p-6 sm:p-8">
+        <div class="flex items-center gap-3 mb-5">
+          <div class="w-12 h-12 rounded-2xl bg-[#008069] text-white flex items-center justify-center text-2xl shadow-md">
+            💬
+          </div>
+          <div>
+            <h1 class="text-xl font-bold text-slate-900">The Inner Circle</h1>
+            <p class="text-xs text-slate-500">Exclusive members-only group room</p>
+          </div>
+        </div>
+
+        <p class="text-sm text-slate-600 mb-5 leading-relaxed">
+          Set up your member identity to enter the single group chat. Only people with this app can join and read messages.
+        </p>
+
+        <form id="profile-form" class="space-y-4">
+          <!-- Display Name -->
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Display Name</label>
+            <input
+              id="setup-name"
+              type="text"
+              maxlength="28"
+              required
+              placeholder="e.g., Aarav, Priya, Alex..."
+              class="w-full px-4 py-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#00a884] focus:bg-white transition"
+            />
+          </div>
+
+          <!-- Status / Bio -->
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">About / Tagline</label>
+            <input
+              id="setup-status"
+              type="text"
+              maxlength="60"
+              placeholder="Available • Ready to chat"
+              value="Hey there! I'm in The Inner Circle."
+              class="w-full px-4 py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-[#00a884] focus:bg-white transition"
+            />
+          </div>
+
+          <!-- Avatar Emoji Selector -->
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Choose Avatar Icon</label>
+            <div id="emoji-choices" class="grid grid-cols-6 gap-2">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <!-- Name Color Selector -->
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Chat Name Color</label>
+            <div id="color-choices" class="flex flex-wrap gap-2.5">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <!-- Preview Badge -->
+          <div class="p-3 rounded-xl bg-[#efeae2] flex items-center gap-3 border border-black/5">
+            <div id="preview-avatar" class="w-10 h-10 rounded-full flex items-center justify-center text-xl shadow-sm bg-emerald-600 text-white shrink-0">
+              😎
+            </div>
+            <div class="bg-white px-3 py-2 rounded-xl shadow-sm flex-1 min-w-0">
+              <div id="preview-name" class="text-xs font-bold text-emerald-700 truncate">Your Name</div>
+              <div class="text-xs text-slate-600 truncate">Hello everyone in the group! 👋</div>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            class="w-full py-3.5 px-5 rounded-xl bg-[#008069] hover:bg-[#006e5a] active:scale-[0.99] text-white font-semibold text-sm shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <span>Join Group Chat</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- ==================== 3. TOP CHAT HEADER ==================== -->
+    <header class="bg-[#008069] text-white px-3 sm:px-4 py-2.5 flex items-center justify-between shadow-md z-20 shrink-0">
+      <div id="header-info-trigger" class="flex items-center gap-3 min-w-0 flex-1 cursor-pointer hover:bg-white/5 p-1 -ml-1 rounded-xl transition">
+        <!-- Group Avatar -->
+        <div class="relative shrink-0">
+          <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/15 border border-white/25 flex items-center justify-center text-xl shadow-inner">
+            🌐
+          </div>
+          <span class="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-[#25d366] ring-2 ring-[#008069]"></span>
+        </div>
+
+        <!-- Group Title & Member Subtext -->
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-1.5">
+            <h1 class="font-semibold text-base sm:text-[17px] leading-tight truncate">The Inner Circle</h1>
+            <span class="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-white/15 text-emerald-100">
+              APP GROUP
+            </span>
+          </div>
+          <p id="header-members-sub" class="text-xs text-emerald-100/90 truncate mt-0.5">
+            Loading members...
+          </p>
+        </div>
+      </div>
+
+      <!-- Header Actions -->
+      <div class="flex items-center gap-1 sm:gap-2 shrink-0">
+        <!-- Install App Button -->
+        <button
+          id="open-install-btn"
+          title="Install / Download App"
+          class="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 text-xs font-medium transition cursor-pointer"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          <span class="hidden md:inline">Install App</span>
+        </button>
+
+        <!-- Group Info Drawer Toggle -->
+        <button
+          id="open-drawer-btn"
+          title="Group Info & Members"
+          class="p-2.5 rounded-xl hover:bg-white/15 active:scale-95 transition cursor-pointer"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- ==================== 4. MAIN MESSAGE STREAM ==================== -->
+    <main id="chat-container" class="relative flex-1 wa-wallpaper overflow-y-auto chat-scroll px-3 sm:px-6 md:px-10 py-4 space-y-1.5">
+      <!-- Encryption / Group Notice Banner -->
+      <div class="flex justify-center my-2">
+        <div class="bg-[#ffeecd] text-[#54656f] text-[11.5px] px-3.5 py-2 rounded-xl shadow-sm max-w-md text-center leading-relaxed border border-amber-200/60">
+          🔒 Messages are private to members who have downloaded &amp; joined <strong>The Inner Circle</strong> app. Tap any message to reply or react.
+        </div>
+      </div>
+
+      <!-- Messages injected here dynamically -->
+      <div id="messages-list" class="space-y-1 pb-2"></div>
+    </main>
+
+    <!-- Floating Scroll-to-Bottom Button -->
+    <button
+      id="scroll-bottom-btn"
+      class="hidden absolute bottom-20 right-4 sm:right-6 z-20 w-10 h-10 rounded-full bg-white text-slate-600 shadow-lg border border-slate-200 flex items-center justify-center hover:bg-slate-50 active:scale-95 transition cursor-pointer"
+      title="Scroll to latest messages"
+    >
+      <span id="unread-badge" class="hidden absolute -top-2 -left-1 min-w-[20px] h-5 px-1 rounded-full bg-[#25d366] text-white text-[11px] font-bold flex items-center justify-center shadow">
+        0
+      </span>
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+      </svg>
+    </button>
+
+    <!-- ==================== 5. BOTTOM INPUT & REPLY BAR ==================== -->
+    <footer class="bg-[#f0f2f5] px-2.5 sm:px-4 py-2 border-t border-slate-200/80 z-20 shrink-0 relative">
+
+      <!-- Emoji Picker Popover -->
+      <div id="emoji-popover" class="hidden absolute bottom-16 left-3 sm:left-4 z-30 bg-white rounded-2xl shadow-xl border border-slate-200 p-3 w-72 sm:w-80">
+        <div class="flex items-center justify-between mb-2 pb-1.5 border-b border-slate-100">
+          <span class="text-xs font-semibold text-slate-500">Pick an Emoji</span>
+          <button id="close-emoji-btn" type="button" class="text-slate-400 hover:text-slate-600 text-xs px-1.5 py-0.5 rounded">✕</button>
+        </div>
+        <div id="emoji-grid" class="grid grid-cols-8 gap-1 text-xl max-h-44 overflow-y-auto">
+          <!-- Populated via JS -->
+        </div>
+      </div>
+
+      <!-- Reply / Quote Preview Bar -->
+      <div id="reply-banner" class="hidden mb-2 bg-white rounded-xl p-2.5 border-l-4 border-[#00a884] shadow-sm flex items-center justify-between gap-2">
+        <div class="min-w-0 flex-1">
+          <div id="reply-banner-sender" class="text-xs font-bold text-[#008069] truncate">Replying to...</div>
+          <div id="reply-banner-text" class="text-xs text-slate-600 truncate mt-0.5">Message snippet</div>
+        </div>
+        <button id="cancel-reply-btn" type="button" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Composer Row -->
+      <div class="flex items-end gap-2">
+        <!-- Emoji Toggle Button -->
+        <button
+          id="toggle-emoji-btn"
+          type="button"
+          title="Insert Emoji"
+          class="p-2.5 rounded-full text-slate-500 hover:text-slate-700 hover:bg-slate-200/70 transition shrink-0 cursor-pointer"
+        >
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </button>
+
+        <!-- Textarea Input -->
+        <div class="flex-1 bg-white rounded-2xl border border-slate-200/90 px-3.5 py-2 shadow-xs focus-within:border-[#00a884] transition">
+          <textarea
+            id="message-input"
+            rows="1"
+            placeholder="Message The Inner Circle..."
+            class="w-full bg-transparent text-slate-800 text-[15px] placeholder-slate-400 focus:outline-none resize-none max-h-28 leading-snug block"
+          ></textarea>
+        </div>
+
+        <!-- Send Button -->
+        <button
+          id="send-btn"
+          type="button"
+          title="Send Message"
+          class="w-11 h-11 rounded-full bg-[#00a884] hover:bg-[#008f6f] active:scale-95 text-white flex items-center justify-center shadow-md transition shrink-0 cursor-pointer"
+        >
+          <svg class="w-5 h-5 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+          </svg>
+        </button>
+      </div>
+    </footer>
+
+    <!-- ==================== 6. GROUP INFO & MEMBERS DRAWER ==================== -->
+    <div id="drawer-backdrop" class="hidden absolute inset-0 bg-black/40 z-30 transition-opacity"></div>
+    <aside id="group-drawer" class="absolute top-0 right-0 bottom-0 w-full sm:w-96 bg-[#f0f2f5] z-40 shadow-2xl transform translate-x-full transition-transform duration-300 flex flex-col">
+      <!-- Drawer Header -->
+      <div class="bg-[#008069] text-white px-4 py-3.5 flex items-center gap-3 shrink-0">
+        <button id="close-drawer-btn" class="p-1.5 rounded-full hover:bg-white/15 transition cursor-pointer">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+        <h2 class="font-semibold text-base">Group Info &amp; Members</h2>
+      </div>
+
+      <!-- Drawer Scrollable Body -->
+      <div class="flex-1 overflow-y-auto chat-scroll space-y-3 pb-6">
+        <!-- Group Card -->
+        <div class="bg-white p-6 flex flex-col items-center text-center shadow-xs">
+          <div class="w-20 h-20 rounded-full bg-[#008069]/10 border-2 border-[#008069]/20 flex items-center justify-center text-4xl mb-3">
+            🌐
+          </div>
+          <h3 class="text-lg font-bold text-slate-900">The Inner Circle</h3>
+          <p id="drawer-member-count" class="text-xs text-slate-500 mt-0.5">Group • 0 members</p>
+          <p class="text-xs text-slate-600 mt-3 max-w-xs leading-relaxed">
+            Unified private chat room exclusively for users who have downloaded and opened this app.
+          </p>
+        </div>
+
+        <!-- Your Identity Card -->
+        <div class="bg-white p-4 shadow-xs">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Your Profile &amp; User ID</span>
+            <button id="edit-profile-btn" class="text-xs font-semibold text-[#008069] hover:underline cursor-pointer">Edit Profile</button>
+          </div>
+          <div class="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-200/70">
+            <div id="drawer-my-avatar" class="w-10 h-10 rounded-full flex items-center justify-center text-lg text-white shrink-0">😎</div>
+            <div class="min-w-0 flex-1">
+              <div id="drawer-my-name" class="text-sm font-semibold text-slate-900 truncate">Loading...</div>
+              <div id="drawer-my-uid" class="text-[11px] font-mono text-slate-500 break-all select-all mt-0.5">uid</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- App Install / Share Banner -->
+        <div class="bg-white p-4 shadow-xs">
+          <button id="drawer-install-btn" class="w-full py-2.5 px-4 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-[#008069] font-semibold text-xs flex items-center justify-center gap-2 border border-emerald-200 transition cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            <span>Download / Install App on Device</span>
+          </button>
+        </div>
+
+        <!-- Members List -->
+        <div class="bg-white p-4 shadow-xs">
+          <div class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
+            App Members (<span id="drawer-list-count">0</span>)
+          </div>
+          <div id="members-list" class="space-y-2.5">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ==================== 7. INSTALL / DOWNLOAD APP GUIDE MODAL ==================== -->
+    <div id="install-modal" class="hidden absolute inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2.5">
+            <div class="w-10 h-10 rounded-xl bg-[#008069] text-white flex items-center justify-center text-lg">📲</div>
+            <div>
+              <h3 class="font-bold text-slate-900 text-base">Install The Inner Circle</h3>
+              <p class="text-xs text-slate-500">Use as a standalone app on mobile or desktop</p>
+            </div>
+          </div>
+          <button id="close-install-modal" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer">✕</button>
+        </div>
+
+        <!-- Native Prompt Button (shown if browser supports beforeinstallprompt) -->
+        <button id="native-install-trigger" class="hidden w-full mb-4 py-3 px-4 rounded-xl bg-[#008069] hover:bg-[#006e5a] text-white font-semibold text-sm shadow-md transition cursor-pointer">
+          ⚡ Install App Now
+        </button>
+
+        <div class="space-y-3 text-xs text-slate-600">
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+            <div class="font-bold text-slate-800 mb-1">🍎 iPhone / iPad (Safari)</div>
+            <p>Tap the <strong>Share</strong> button <span class="inline-block px-1.5 py-0.5 bg-white border rounded">⎋</span> at the bottom of Safari, then select <strong>"Add to Home Screen"</strong>.</p>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+            <div class="font-bold text-slate-800 mb-1">🤖 Android (Chrome)</div>
+            <p>Tap the <strong>⋮ Menu</strong> in the top-right corner, then tap <strong>"Install app"</strong> or <strong>"Add to Home screen"</strong>.</p>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+            <div class="font-bold text-slate-800 mb-1">💻 Desktop (Chrome / Edge)</div>
+            <p>Click the <strong>Install icon</strong> in the right side of the address bar to launch in its own native window.</p>
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+          <button id="copy-app-link-btn" class="flex-1 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs transition cursor-pointer">
+            📋 Copy Invite Link
+          </button>
+          <button id="done-install-modal" class="py-2.5 px-5 rounded-xl bg-[#008069] text-white font-semibold text-xs hover:bg-[#006e5a] transition cursor-pointer">
+            Got it
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 8. DELETE MESSAGE CONFIRMATION MODAL ==================== -->
+    <div id="delete-modal" class="hidden absolute inset-0 z-50 bg-black/45 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl max-w-xs w-full p-5 shadow-2xl">
+        <h3 class="font-bold text-slate-900 text-base">Delete message?</h3>
+        <p class="text-xs text-slate-500 mt-1.5 leading-relaxed">
+          This message will be removed for everyone in The Inner Circle.
+        </p>
+        <div class="mt-5 flex justify-end gap-2">
+          <button id="cancel-delete-btn" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer">
+            Cancel
+          </button>
+          <button id="confirm-delete-btn" class="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white shadow-sm transition cursor-pointer">
+            Delete for Everyone
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-slate-900/90 text-white text-xs font-medium px-4 py-2.5 rounded-full shadow-lg pointer-events-none transition-opacity">
+      Copied!
+    </div>
+
+  </div>
+
+  <!-- ==================== FIREBASE & APP LOGIC ==================== -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import {
+      getFirestore,
+      collection,
+      doc,
+      setDoc,
+      addDoc,
+      updateDoc,
+      onSnapshot,
+      serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // ---------------------------------------------------------
+    // 1. PWA Dynamic Manifest Setup
+    // ---------------------------------------------------------
+    try {
+      const manifestData = {
+        name: "The Inner Circle - Group Chat",
+        short_name: "Inner Circle",
+        start_url: ".",
+        display: "standalone",
+        background_color: "#efeae2",
+        theme_color: "#008069",
+        icons: [
+          {
+            src: "https://placehold.co/192x192/008069/ffffff?text=IC",
+            sizes: "192x192",
+            type: "image/png"
+          },
+          {
+            src: "https://placehold.co/512x512/008069/ffffff?text=IC",
+            sizes: "512x512",
+            type: "image/png"
+          }
+        ]
+      };
+      const blob = new Blob([JSON.stringify(manifestData)], { type: "application/json" });
+      document.getElementById("pwa-manifest").setAttribute("href", URL.createObjectURL(blob));
+    } catch (e) {
+      console.warn("Manifest setup skipped:", e);
+    }
+
+    let deferredInstallPrompt = null;
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      document.getElementById("native-install-trigger").classList.remove("hidden");
+    });
+
+    // ---------------------------------------------------------
+    // 2. Firebase Initialization & Config
+    // ---------------------------------------------------------
+    const appId = typeof __app_id !== "undefined" ? __app_id : "default-app-id";
+    const firebaseConfig = typeof __firebase_config !== "undefined"
+      ? JSON.parse(__firebase_config)
+      : { apiKey: "demo", authDomain: "demo.firebaseapp.com", projectId: "demo" };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // ---------------------------------------------------------
+    // 3. Application State
+    // ---------------------------------------------------------
+    let currentUser = null;
+    let currentUserProfile = null;
+    let allMessages = [];
+    let allMembers = {};
+    let replyingTo = null; // { id, senderName, text }
+    let pendingDeleteMsgId = null;
+    let unreadWhileScrolledUp = 0;
+    let heartbeatInterval = null;
+
+    const AVATAR_EMOJIS = ["😎", "🦊", "🐼", "🦁", "🐸", "🦄", "🚀", "⚡", "🌸", "🔥", "🎧", "💎"];
+    const NAME_COLORS = [
+      { name: "Emerald", hex: "#047857", bg: "#059669" },
+      { name: "Royal Blue", hex: "#1d4ed8", bg: "#2563eb" },
+      { name: "Purple", hex: "#6d28d9", bg: "#7c3aed" },
+      { name: "Rose", hex: "#be123c", bg: "#e11d48" },
+      { name: "Amber", hex: "#b45309", bg: "#d97706" },
+      { name: "Teal", hex: "#0f766e", bg: "#0d9488" },
+      { name: "Indigo", hex: "#4338ca", bg: "#4f46e5" },
+      { name: "Pink", hex: "#be185d", bg: "#db2777" }
+    ];
+    const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+    const PICKER_EMOJIS = [
+      "😀","😂","🥹","😍","🤩","😎","🥳","🤔",
+      "🙌","👏","👍","👎","❤️","🔥","✨","🎉",
+      "💯","🙏","🤝","💪","👀","😅","😭","🤯",
+      "☕","🍕","🚀","🌟","💡","🎶","📸","✅"
+    ];
+
+    let selectedEmoji = AVATAR_EMOJIS[0];
+    let selectedColor = NAME_COLORS[0];
+
+    // ---------------------------------------------------------
+    // 4. DOM References
+    // ---------------------------------------------------------
+    const loadingScreen = document.getElementById("loading-screen");
+    const onboardingScreen = document.getElementById("onboarding-screen");
+    const chatContainer = document.getElementById("chat-container");
+    const messagesList = document.getElementById("messages-list");
+    const messageInput = document.getElementById("message-input");
+    const sendBtn = document.getElementById("send-btn");
+    const replyBanner = document.getElementById("reply-banner");
+    const scrollBottomBtn = document.getElementById("scroll-bottom-btn");
+    const unreadBadge = document.getElementById("unread-badge");
+
+    // ---------------------------------------------------------
+    // 5. Utility Helpers
+    // ---------------------------------------------------------
+    function showToast(msg) {
+      const toast = document.getElementById("toast");
+      toast.textContent = msg;
+      toast.classList.remove("hidden");
+      clearTimeout(toast._timer);
+      toast._timer = setTimeout(() => toast.classList.add("hidden"), 2400);
+    }
+
+    function escapeHTML(str) {
+      const div = document.createElement("div");
+      div.textContent = str || "";
+      return div.innerHTML;
+    }
+
+    function formatTime(ts) {
+      if (!ts) return "Just now";
+      const date = ts.toDate ? ts.toDate() : new Date(ts);
+      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+
+    function getDateLabel(ts) {
+      const date = ts && ts.toDate ? ts.toDate() : new Date();
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const diffDays = Math.round((today - target) / (1000 * 60 * 60 * 24));
+      if (diffDays === 0) return "Today";
+      if (diffDays === 1) return "Yesterday";
+      return date.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+    }
+
+    function isNearBottom() {
+      return chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < 130;
+    }
+
+    function scrollToBottom(smooth = true) {
+      chatContainer.scrollTo({
+        top: chatContainer.scrollHeight,
+        behavior: smooth ? "smooth" : "auto"
+      });
+      unreadWhileScrolledUp = 0;
+      unreadBadge.classList.add("hidden");
+      scrollBottomBtn.classList.add("hidden");
+    }
+
+    // ---------------------------------------------------------
+    // 6. Initialize Onboarding & Emoji Pickers UI
+    // ---------------------------------------------------------
+    function initStaticPickers() {
+      // Avatar Emoji Choices
+      const emojiContainer = document.getElementById("emoji-choices");
+      emojiContainer.innerHTML = AVATAR_EMOJIS.map((em) => `
+        <button type="button" data-emoji="${em}" class="emoji-opt h-10 rounded-xl text-xl flex items-center justify-center border transition cursor-pointer ${em === selectedEmoji ? "bg-emerald-50 border-[#00a884] ring-2 ring-[#00a884]/30" : "bg-slate-50 border-slate-200 hover:bg-slate-100"}">
+          ${em}
+        </button>
+      `).join("");
+
+      emojiContainer.querySelectorAll(".emoji-opt").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          selectedEmoji = btn.dataset.emoji;
+          emojiContainer.querySelectorAll(".emoji-opt").forEach((b) => {
+            b.className = "emoji-opt h-10 rounded-xl text-xl flex items-center justify-center border transition cursor-pointer bg-slate-50 border-slate-200 hover:bg-slate-100";
+          });
+          btn.className = "emoji-opt h-10 rounded-xl text-xl flex items-center justify-center border transition cursor-pointer bg-emerald-50 border-[#00a884] ring-2 ring-[#00a884]/30";
+          updateProfilePreview();
+        });
+      });
+
+      // Name Color Choices
+      const colorContainer = document.getElementById("color-choices");
+      colorContainer.innerHTML = NAME_COLORS.map((c, idx) => `
+        <button type="button" data-idx="${idx}" title="${c.name}" style="background-color:${c.bg}" class="color-opt w-7 h-7 rounded-full transition transform cursor-pointer ${idx === 0 ? "ring-2 ring-offset-2 ring-slate-800 scale-110" : "opacity-80 hover:opacity-100"}"></button>
+      `).join("");
+
+      colorContainer.querySelectorAll(".color-opt").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          selectedColor = NAME_COLORS[Number(btn.dataset.idx)];
+          colorContainer.querySelectorAll(".color-opt").forEach((b) => {
+            b.className = "color-opt w-7 h-7 rounded-full transition transform cursor-pointer opacity-80 hover:opacity-100";
+          });
+          btn.className = "color-opt w-7 h-7 rounded-full transition transform cursor-pointer ring-2 ring-offset-2 ring-slate-800 scale-110";
+          updateProfilePreview();
+        });
+      });
+
+      document.getElementById("setup-name").addEventListener("input", updateProfilePreview);
+
+      // Composer Emoji Picker Grid
+      const pickerGrid = document.getElementById("emoji-grid");
+      pickerGrid.innerHTML = PICKER_EMOJIS.map((em) => `
+        <button type="button" class="p-1.5 rounded-lg hover:bg-slate-100 active:scale-90 transition cursor-pointer">${em}</button>
+      `).join("");
+      pickerGrid.querySelectorAll("button").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const start = messageInput.selectionStart;
+          const end = messageInput.selectionEnd;
+          const val = messageInput.value;
+          messageInput.value = val.slice(0, start) + btn.textContent + val.slice(end);
+          messageInput.focus();
+          messageInput.selectionStart = messageInput.selectionEnd = start + btn.textContent.length;
+        });
+      });
+    }
+
+    function updateProfilePreview() {
+      const nameVal = document.getElementById("setup-name").value.trim() || "Your Name";
+      const prevAvatar = document.getElementById("preview-avatar");
+      const prevName = document.getElementById("preview-name");
+      prevAvatar.textContent = selectedEmoji;
+      prevAvatar.style.backgroundColor = selectedColor.bg;
+      prevName.textContent = nameVal;
+      prevName.style.color = selectedColor.hex;
+    }
+
+    // ---------------------------------------------------------
+    // 7. Authentication & Firestore Real-Time Listeners
+    // ---------------------------------------------------------
+    async function bootApp() {
+      initStaticPickers();
+
+      try {
+        // RULE 3: Authenticate FIRST before any Firestore operation
+        if (typeof __initial_auth_token !== "undefined" && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+        currentUser = auth.currentUser;
+        if (!currentUser) throw new Error("Authentication failed");
+
+        startRealtimeListeners();
+      } catch (err) {
+        console.error("Boot error:", err);
+        loadingScreen.innerHTML = `
+          <div class="max-w-sm bg-white p-6 rounded-2xl shadow-lg text-center">
+            <div class="text-3xl mb-2">⚠️</div>
+            <h3 class="font-bold text-slate-900">Connection Error</h3>
+            <p class="text-xs text-slate-500 mt-1">${escapeHTML(err.message)}</p>
+          </div>
+        `;
+      }
+    }
+
+    function startRealtimeListeners() {
+      if (!currentUser) return;
+
+      // RULE 1: Strict Public Collection Paths
+      const membersCol = collection(db, "artifacts", appId, "public", "data", "group_members");
+      const messagesCol = collection(db, "artifacts", appId, "public", "data", "group_messages");
+
+      let initialMemberCheckDone = false;
+
+      // Listen to all group members
+      onSnapshot(
+        membersCol,
+        (snapshot) => {
+          const map = {};
+          snapshot.forEach((docSnap) => {
+            map[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
+          });
+          allMembers = map;
+
+          if (allMembers[currentUser.uid]) {
+            currentUserProfile = allMembers[currentUser.uid];
+            loadingScreen.classList.add("hidden");
+            onboardingScreen.classList.add("hidden");
+            startPresenceHeartbeat();
+          } else if (!initialMemberCheckDone) {
+            loadingScreen.classList.add("hidden");
+            onboardingScreen.classList.remove("hidden");
+          }
+          initialMemberCheckDone = true;
+          renderMembersUI();
+        },
+        (error) => {
+          console.error("Members snapshot error:", error);
+        }
+      );
+
+      // Listen to all group messages (RULE 2: No orderBy/where; sort in memory)
+      onSnapshot(
+        messagesCol,
+        (snapshot) => {
+          const wasAtBottom = isNearBottom();
+          const prevCount = allMessages.length;
+
+          const msgs = [];
+          snapshot.forEach((docSnap) => {
+            msgs.push({ id: docSnap.id, ...docSnap.data() });
+          });
+
+          // Sort chronologically by clientCreatedAt / createdAt
+          msgs.sort((a, b) => {
+            const tA = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.clientTime || 0);
+            const tB = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.clientTime || 0);
+            return tA - tB;
+          });
+
+          allMessages = msgs;
+          renderMessages();
+
+          if (prevCount === 0 || wasAtBottom) {
+            scrollToBottom(prevCount > 0);
+          } else if (msgs.length > prevCount) {
+            unreadWhileScrolledUp += msgs.length - prevCount;
+            unreadBadge.textContent = unreadWhileScrolledUp;
+            unreadBadge.classList.remove("hidden");
+            scrollBottomBtn.classList.remove("hidden");
+          }
+        },
+        (error) => {
+          console.error("Messages snapshot error:", error);
+        }
+      );
+    }
+
+    // Keep user's lastSeen timestamp fresh every 30s
+    function startPresenceHeartbeat() {
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
+      const ping = async () => {
+        if (!currentUser || !currentUserProfile) return;
+        try {
+          const memberRef = doc(db, "artifacts", appId, "public", "data", "group_members", currentUser.uid);
+          await updateDoc(memberRef, { lastSeen: Date.now() });
+        } catch (_) {}
+      };
+      heartbeatInterval = setInterval(ping, 30000);
+    }
+
+    // ---------------------------------------------------------
+    // 8. Save Profile (Onboarding or Edit)
+    // ---------------------------------------------------------
+    document.getElementById("profile-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!currentUser) return;
+
+      const nameInput = document.getElementById("setup-name").value.trim();
+      const statusInput = document.getElementById("setup-status").value.trim() || "Available";
+      if (!nameInput) return;
+
+      const memberRef = doc(db, "artifacts", appId, "public", "data", "group_members", currentUser.uid);
+      const isNewMember = !currentUserProfile;
+
+      const profilePayload = {
+        uid: currentUser.uid,
+        name: nameInput,
+        status: statusInput,
+        emoji: selectedEmoji,
+        colorHex: selectedColor.hex,
+        colorBg: selectedColor.bg,
+        lastSeen: Date.now(),
+        joinedAt: currentUserProfile?.joinedAt || Date.now()
+      };
+
+      try {
+        await setDoc(memberRef, profilePayload, { merge: true });
+        currentUserProfile = profilePayload;
+        onboardingScreen.classList.add("hidden");
+
+        // Post a subtle system welcome message if first time joining
+        if (isNewMember) {
+          const messagesCol = collection(db, "artifacts", appId, "public", "data", "group_messages");
+          await addDoc(messagesCol, {
+            type: "system",
+            text: `${nameInput} joined The Inner Circle`,
+            senderId: currentUser.uid,
+            clientTime: Date.now(),
+            createdAt: serverTimestamp()
+          });
+        }
+        showToast(isNewMember ? "Welcome to The Inner Circle!" : "Profile updated");
+      } catch (err) {
+        console.error("Profile save error:", err);
+        showToast("Could not save profile. Try again.");
+      }
+    });
+
+    // ---------------------------------------------------------
+    // 9. Render Group Members & Header Status
+    // ---------------------------------------------------------
+    function renderMembersUI() {
+      const membersArr = Object.values(allMembers);
+      const now = Date.now();
+      const onlineMembers = membersArr.filter((m) => now - (m.lastSeen || 0) < 75000);
+
+      // Header subtext
+      const namesPreview = membersArr
+        .slice(0, 4)
+        .map((m) => (m.uid === currentUser?.uid ? "You" : m.name))
+        .join(", ");
+      const extraCount = membersArr.length > 4 ? ` +${membersArr.length - 4}` : "";
+      document.getElementById("header-members-sub").textContent =
+        membersArr.length > 0
+          ? `${onlineMembers.length} online • ${namesPreview}${extraCount}`
+          : "Tap for group info";
+
+      // Drawer stats
+      document.getElementById("drawer-member-count").textContent = `Group • ${membersArr.length} member${membersArr.length === 1 ? "" : "s"}`;
+      document.getElementById("drawer-list-count").textContent = membersArr.length;
+
+      // Current User Card in Drawer
+      if (currentUserProfile) {
+        const myAv = document.getElementById("drawer-my-avatar");
+        myAv.textContent = currentUserProfile.emoji || "😎";
+        myAv.style.backgroundColor = currentUserProfile.colorBg || "#059669";
+        document.getElementById("drawer-my-name").textContent = currentUserProfile.name;
+        document.getElementById("drawer-my-uid").textContent = currentUser.uid;
+      }
+
+      // Sort members: online first, then alphabetical
+      membersArr.sort((a, b) => {
+        const aOn = now - (a.lastSeen || 0) < 75000 ? 1 : 0;
+        const bOn = now - (b.lastSeen || 0) < 75000 ? 1 : 0;
+        if (bOn !== aOn) return bOn - aOn;
+        return (a.name || "").localeCompare(b.name || "");
+      });
+
+      const listEl = document.getElementById("members-list");
+      listEl.innerHTML = membersArr
+        .map((m) => {
+          const isOnline = now - (m.lastSeen || 0) < 75000;
+          const isMe = m.uid === currentUser?.uid;
+          return `
+            <div class="flex items-center justify-between gap-3 p-2 rounded-xl hover:bg-slate-50 transition">
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="relative shrink-0">
+                  <div style="background-color:${m.colorBg || "#059669"}" class="w-10 h-10 rounded-full flex items-center justify-center text-lg text-white shadow-xs">
+                    ${escapeHTML(m.emoji || "😎")}
+                  </div>
+                  ${isOnline ? `<span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[#25d366] ring-2 ring-white"></span>` : ""}
+                </div>
+                <div class="min-w-0">
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-sm font-semibold text-slate-800 truncate">${escapeHTML(m.name)}</span>
+                    ${isMe ? `<span class="text-[10px] font-semibold px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded">You</span>` : ""}
+                  </div>
+                  <div class="text-xs text-slate-500 truncate">${escapeHTML(m.status || "Available")}</div>
+                </div>
+              </div>
+              <span class="text-[11px] font-medium shrink-0 ${isOnline ? "text-emerald-600" : "text-slate-400"}">
+                ${isOnline ? "Online" : "Offline"}
+              </span>
+            </div>
+          `;
+        })
+        .join("");
+    }
+
+    // ---------------------------------------------------------
+    // 10. Render Chat Messages
+    // ---------------------------------------------------------
+    function renderMessages() {
+      if (allMessages.length === 0) {
+        messagesList.innerHTML = `
+          <div class="text-center py-10">
+            <span class="inline-block bg-white/85 text-slate-600 text-xs px-4 py-2 rounded-xl shadow-xs">
+              No messages yet. Say hello to start the conversation! 👋
+            </span>
+          </div>
+        `;
+        return;
+      }
+
+      let html = "";
+      let lastDateLabel = null;
+      let prevSenderId = null;
+
+      allMessages.forEach((msg) => {
+        const dateLabel = getDateLabel(msg.createdAt || msg.clientTime);
+        if (dateLabel !== lastDateLabel) {
+          html += `
+            <div class="flex justify-center my-3 sticky top-1 z-10">
+              <span class="bg-white/95 text-[#54656f] text-[11px] font-semibold px-3 py-1 rounded-lg shadow-xs uppercase tracking-wide">
+                ${dateLabel}
+              </span>
+            </div>
+          `;
+          lastDateLabel = dateLabel;
+          prevSenderId = null;
+        }
+
+        // System join notification
+        if (msg.type === "system") {
+          html += `
+            <div class="flex justify-center my-2">
+              <span class="bg-[#e1f3fb] text-[#54656f] text-[11.5px] px-3 py-1 rounded-lg shadow-2xs">
+                ${escapeHTML(msg.text)}
+              </span>
+            </div>
+          `;
+          prevSenderId = null;
+          return;
+        }
+
+        const isMine = msg.senderId === currentUser?.uid;
+        const isFirstInSequence = prevSenderId !== msg.senderId;
+        prevSenderId = msg.senderId;
+
+        const memberProfile = allMembers[msg.senderId] || {};
+        const senderName = memberProfile.name || msg.senderName || "Member";
+        const senderEmoji = memberProfile.emoji || msg.senderEmoji || "😎";
+        const senderColor = memberProfile.colorHex || msg.senderColor || "#047857";
+        const senderBg = memberProfile.colorBg || "#059669";
+
+        // Reactions aggregation
+        const reactionsMap = msg.reactions || {};
+        const reactionCounts = {};
+        Object.values(reactionsMap).forEach((em) => {
+          if (em) reactionCounts[em] = (reactionCounts[em] || 0) + 1;
+        });
+        const reactionEntries = Object.entries(reactionCounts);
+        const myReaction = currentUser ? reactionsMap[currentUser.uid] : null;
+
+        // Quoted Reply Snippet inside bubble
+        let replyBlock = "";
+        if (msg.replyTo && !msg.deleted) {
+          replyBlock = `
+            <div data-jump-id="${escapeHTML(msg.replyTo.id)}" class="jump-reply-box mb-1.5 p-2 rounded-lg bg-black/5 border-l-4 border-[#00a884] cursor-pointer hover:bg-black/10 transition text-left">
+              <div class="text-[11px] font-bold text-[#008069] truncate">${escapeHTML(msg.replyTo.senderName)}</div>
+              <div class="text-xs text-slate-600 truncate">${escapeHTML(msg.replyTo.text)}</div>
+            </div>
+          `;
+        }
+
+        // Message body content
+        const bodyContent = msg.deleted
+          ? `<p class="text-[13.5px] italic text-slate-500 flex items-center gap-1.5"><span>🚫</span><span>${isMine ? "You deleted this message" : "This message was deleted"}</span></p>`
+          : `<p class="text-[14.5px] text-[#111b21] whitespace-pre-wrap break-words leading-[1.38]">${escapeHTML(msg.text)}</p>`;
+
+        // Double check ticks for outgoing messages
+        const statusTicks = isMine
+          ? `<svg class="w-4 h-4 text-[#53bdeb] inline-block ml-0.5 shrink-0" viewBox="0 0 16 15" fill="currentColor">
+               <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.064-.512zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z"/>
+             </svg>`
+          : "";
+
+        html += `
+          <div id="msg-${msg.id}" class="group flex items-end gap-2 ${isMine ? "justify-end" : "justify-start"} ${isFirstInSequence ? "mt-2.5" : "mt-0.5"}">
+
+            <!-- Incoming Sender Avatar (shown on first message in sequence) -->
+            ${
+              !isMine
+                ? isFirstInSequence
+                  ? `<div style="background-color:${senderBg}" class="w-7 h-7 rounded-full flex items-center justify-center text-sm text-white shrink-0 mb-1 shadow-xs">${escapeHTML(senderEmoji)}</div>`
+                  : `<div class="w-7 shrink-0"></div>`
+                : ""
+            }
+
+            <!-- Message Bubble + Hover Action Bar -->
+            <div class="relative max-w-[82%] sm:max-w-[70%] flex flex-col ${isMine ? "items-end" : "items-start"}">
+
+              <!-- Quick Action Toolbar (Reply, React, Delete) -->
+              ${
+                !msg.deleted
+                  ? `<div class="opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex items-center gap-0.5 bg-white/95 backdrop-blur-xs border border-slate-200 rounded-full px-1.5 py-0.5 shadow-md mb-1 z-10">
+                      ${QUICK_REACTIONS.map(
+                        (em) => `
+                        <button type="button" data-msg-id="${msg.id}" data-react="${em}" class="react-btn text-sm hover:scale-125 transition px-1 py-0.5 rounded-full cursor-pointer ${myReaction === em ? "bg-emerald-100" : ""}">
+                          ${em}
+                        </button>
+                      `
+                      ).join("")}
+                      <span class="w-px h-3.5 bg-slate-200 mx-0.5"></span>
+                      <button type="button" data-msg-id="${msg.id}" title="Reply" class="reply-btn p-1 text-slate-500 hover:text-[#008069] rounded-full cursor-pointer">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                        </svg>
+                      </button>
+                      ${
+                        isMine
+                          ? `<button type="button" data-msg-id="${msg.id}" title="Delete" class="delete-btn p-1 text-slate-400 hover:text-rose-600 rounded-full cursor-pointer">
+                              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>`
+                          : ""
+                      }
+                    </div>`
+                  : ""
+              }
+
+              <!-- Actual Bubble -->
+              <div class="relative px-3 pt-2 pb-1.5 min-w-[90px] ${
+                isMine
+                  ? isFirstInSequence
+                    ? "bubble-out"
+                    : "bubble-out-cont"
+                  : isFirstInSequence
+                  ? "bubble-in"
+                  : "bubble-in-cont"
+              }">
+                <!-- Sender Name Header for Incoming Messages -->
+                ${
+                  !isMine && isFirstInSequence
+                    ? `<div style="color:${senderColor}" class="text-[12.5px] font-bold leading-tight mb-1">${escapeHTML(senderName)}</div>`
+                    : ""
+                }
+
+                ${replyBlock}
+                ${bodyContent}
+
+                <!-- Timestamp & Read Receipt -->
+                <div class="flex items-center justify-end gap-1 mt-1 -mb-0.5 select-none">
+                  <span class="text-[10.5px] text-[#667781]">${formatTime(msg.createdAt || msg.clientTime)}</span>
+                  ${statusTicks}
+                </div>
+              </div>
+
+              <!-- Reactions Pill Row -->
+              ${
+                reactionEntries.length > 0
+                  ? `<div class="flex flex-wrap gap-1 -mt-1.5 px-1.5 z-10">
+                      ${reactionEntries
+                        .map(
+                          ([em, count]) => `
+                        <button type="button" data-msg-id="${msg.id}" data-react="${em}" class="react-btn inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs shadow-xs border transition cursor-pointer ${
+                            myReaction === em
+                              ? "bg-emerald-50 border-emerald-300 text-emerald-900 font-semibold"
+                              : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                          }">
+                          <span>${em}</span>
+                          ${count > 1 ? `<span class="text-[10px]">${count}</span>` : ""}
+                        </button>
+                      `
+                        )
+                        .join("")}
+                    </div>`
+                  : ""
+              }
+
+            </div>
+          </div>
+        `;
+      });
+
+      messagesList.innerHTML = html;
+      attachMessageEvents();
+    }
+
+    // ---------------------------------------------------------
+    // 11. Interactive Message Actions (Reply, React, Delete, Jump)
+    // ---------------------------------------------------------
+    function attachMessageEvents() {
+      // Reply buttons
+      messagesList.querySelectorAll(".reply-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const msg = allMessages.find((m) => m.id === btn.dataset.msgId);
+          if (!msg) return;
+          const member = allMembers[msg.senderId];
+          const senderName = msg.senderId === currentUser?.uid ? "You" : (member?.name || msg.senderName || "Member");
+          replyingTo = {
+            id: msg.id,
+            senderName,
+            text: msg.text
+          };
+          document.getElementById("reply-banner-sender").textContent = `Replying to ${senderName}`;
+          document.getElementById("reply-banner-text").textContent = msg.text;
+          replyBanner.classList.remove("hidden");
+          messageInput.focus();
+        });
+      });
+
+      // Reaction buttons
+      messagesList.querySelectorAll(".react-btn").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          if (!currentUser) return;
+          const msgId = btn.dataset.msgId;
+          const emoji = btn.dataset.react;
+          const msg = allMessages.find((m) => m.id === msgId);
+          if (!msg) return;
+
+          const currentReactions = { ...(msg.reactions || {}) };
+          if (currentReactions[currentUser.uid] === emoji) {
+            delete currentReactions[currentUser.uid];
+          } else {
+            currentReactions[currentUser.uid] = emoji;
+          }
+
+          try {
+            const msgRef = doc(db, "artifacts", appId, "public", "data", "group_messages", msgId);
+            await updateDoc(msgRef, { reactions: currentReactions });
+          } catch (err) {
+            console.error("Reaction failed:", err);
+          }
+        });
+      });
+
+      // Delete buttons
+      messagesList.querySelectorAll(".delete-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          pendingDeleteMsgId = btn.dataset.msgId;
+          document.getElementById("delete-modal").classList.remove("hidden");
+        });
+      });
+
+      // Jump to quoted original message
+      messagesList.querySelectorAll(".jump-reply-box").forEach((box) => {
+        box.addEventListener("click", () => {
+          const targetEl = document.getElementById(`msg-${box.dataset.jumpId}`);
+          if (targetEl) {
+            targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+            targetEl.classList.remove("highlight-msg");
+            void targetEl.offsetWidth;
+            targetEl.classList.add("highlight-msg");
+          }
+        });
+      });
+    }
+
+    // ---------------------------------------------------------
+    // 12. Send New Message
+    // ---------------------------------------------------------
+    async function sendMessage() {
+      if (!currentUser || !currentUserProfile) return;
+      const text = messageInput.value.trim();
+      if (!text) return;
+
+      const payload = {
+        type: "text",
+        text,
+        senderId: currentUser.uid,
+        senderName: currentUserProfile.name,
+        senderEmoji: currentUserProfile.emoji,
+        senderColor: currentUserProfile.colorHex,
+        replyTo: replyingTo ? { ...replyingTo } : null,
+        reactions: {},
+        deleted: false,
+        clientTime: Date.now(),
+        createdAt: serverTimestamp()
+      };
+
+      // Reset composer immediately for snappy UX
+      messageInput.value = "";
+      messageInput.style.height = "auto";
+      replyingTo = null;
+      replyBanner.classList.add("hidden");
+      document.getElementById("emoji-popover").classList.add("hidden");
+
+      try {
+        const messagesCol = collection(db, "artifacts", appId, "public", "data", "group_messages");
+        await addDoc(messagesCol, payload);
+        scrollToBottom(true);
+      } catch (err) {
+        console.error("Send error:", err);
+        showToast("Failed to send message");
+      }
+    }
+
+    sendBtn.addEventListener("click", sendMessage);
+
+    messageInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    // Auto-resize textarea height
+    messageInput.addEventListener("input", () => {
+      messageInput.style.height = "auto";
+      messageInput.style.height = Math.min(messageInput.scrollHeight, 112) + "px";
+    });
+
+    // Cancel reply
+    document.getElementById("cancel-reply-btn").addEventListener("click", () => {
+      replyingTo = null;
+      replyBanner.classList.add("hidden");
+    });
+
+    // ---------------------------------------------------------
+    // 13. UI Drawers, Modals & Scroll Listeners
+    // ---------------------------------------------------------
+    const groupDrawer = document.getElementById("group-drawer");
+    const drawerBackdrop = document.getElementById("drawer-backdrop");
+
+    function openDrawer() {
+      drawerBackdrop.classList.remove("hidden");
+      groupDrawer.classList.remove("translate-x-full");
+    }
+    function closeDrawer() {
+      drawerBackdrop.classList.add("hidden");
+      groupDrawer.classList.add("translate-x-full");
+    }
+
+    document.getElementById("open-drawer-btn").addEventListener("click", openDrawer);
+    document.getElementById("header-info-trigger").addEventListener("click", openDrawer);
+    document.getElementById("close-drawer-btn").addEventListener("click", closeDrawer);
+    drawerBackdrop.addEventListener("click", closeDrawer);
+
+    // Edit Profile from Drawer
+    document.getElementById("edit-profile-btn").addEventListener("click", () => {
+      closeDrawer();
+      if (currentUserProfile) {
+        document.getElementById("setup-name").value = currentUserProfile.name || "";
+        document.getElementById("setup-status").value = currentUserProfile.status || "";
+        selectedEmoji = currentUserProfile.emoji || AVATAR_EMOJIS[0];
+        const foundColor = NAME_COLORS.find((c) => c.hex === currentUserProfile.colorHex);
+        if (foundColor) selectedColor = foundColor;
+        updateProfilePreview();
+      }
+      onboardingScreen.classList.remove("hidden");
+    });
+
+    // Emoji Popover
+    const emojiPopover = document.getElementById("emoji-popover");
+    document.getElementById("toggle-emoji-btn").addEventListener("click", () => {
+      emojiPopover.classList.toggle("hidden");
+    });
+    document.getElementById("close-emoji-btn").addEventListener("click", () => {
+      emojiPopover.classList.add("hidden");
+    });
+
+    // Install Modal
+    const installModal = document.getElementById("install-modal");
+    document.getElementById("open-install-btn").addEventListener("click", () => installModal.classList.remove("hidden"));
+    document.getElementById("drawer-install-btn").addEventListener("click", () => {
+      closeDrawer();
+      installModal.classList.remove("hidden");
+    });
+    document.getElementById("close-install-modal").addEventListener("click", () => installModal.classList.add("hidden"));
+    document.getElementById("done-install-modal").addEventListener("click", () => installModal.classList.add("hidden"));
+
+    document.getElementById("native-install-trigger").addEventListener("click", async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+      document.getElementById("native-install-trigger").classList.add("hidden");
+    });
+
+    // Copy Invite Link using document.execCommand('copy')
+    document.getElementById("copy-app-link-btn").addEventListener("click", () => {
+      const tempInput = document.createElement("input");
+      tempInput.value = window.location.href;
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      try {
+        document.execCommand("copy");
+        showToast("App link copied to clipboard!");
+      } catch (_) {
+        showToast("Copy link from address bar");
+      }
+      document.body.removeChild(tempInput);
+    });
+
+    // Delete Confirmation Modal
+    const deleteModal = document.getElementById("delete-modal");
+    document.getElementById("cancel-delete-btn").addEventListener("click", () => {
+      pendingDeleteMsgId = null;
+      deleteModal.classList.add("hidden");
+    });
+    document.getElementById("confirm-delete-btn").addEventListener("click", async () => {
+      if (!pendingDeleteMsgId) return;
+      try {
+        const msgRef = doc(db, "artifacts", appId, "public", "data", "group_messages", pendingDeleteMsgId);
+        await updateDoc(msgRef, { deleted: true, text: "", reactions: {} });
+        showToast("Message deleted");
+      } catch (err) {
+        console.error("Delete failed:", err);
+      }
+      pendingDeleteMsgId = null;
+      deleteModal.classList.add("hidden");
+    });
+
+    // Scroll tracking for floating scroll-to-bottom button
+    chatContainer.addEventListener("scroll", () => {
+      if (isNearBottom()) {
+        scrollBottomBtn.classList.add("hidden");
+        unreadWhileScrolledUp = 0;
+        unreadBadge.classList.add("hidden");
+      } else {
+        scrollBottomBtn.classList.remove("hidden");
+      }
+    });
+    scrollBottomBtn.addEventListener("click", () => scrollToBottom(true));
+
+    // Start Application
+    bootApp();
+  </script>
+</body>
+</html>

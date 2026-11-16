@@ -1,0 +1,9 @@
+{
+  "name": "The Inner Circle",
+  "short_name": "InnerCircle",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#075E54",
+  "theme_color": "#075E54",
+  "orientation": "portrait"
+}

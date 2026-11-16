@@ -1,0 +1,6 @@
+{
+  "appId": "com.innercircle.groupchat",
+  "appName": "The Inner Circle",
+  "webDir": "www",
+  "bundledWebRuntime": false
+}
